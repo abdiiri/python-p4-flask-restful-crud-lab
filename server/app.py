@@ -1,55 +1,54 @@
-#!/usr/bin/env python3
-
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, request, jsonify, make_response
 from flask_migrate import Migrate
-from flask_restful import Api, Resource
-
-from models import db, Plant
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///plants.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.json.compact = False
 
+db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-db.init_app(app)
+CORS(app)
 
-api = Api(app)
+from models import Message
 
+@app.route('/')
+def index():
+    return jsonify({"message": "Welcome to Chatterbox API"}), 200
 
-class Plants(Resource):
+@app.route('/messages', methods=['GET'])
+def get_messages():
+    messages = Message.query.order_by(Message.created_at.asc()).all()
+    return jsonify([msg.to_dict() for msg in messages]), 200
 
-    def get(self):
-        plants = [plant.to_dict() for plant in Plant.query.all()]
-        return make_response(jsonify(plants), 200)
+@app.route('/messages', methods=['POST'])
+def create_message():
+    data = request.get_json()
+    message = Message(
+        body=data.get('body'),
+        username=data.get('username')
+    )
+    db.session.add(message)
+    db.session.commit()
+    return jsonify(message.to_dict()), 201
 
-    def post(self):
-        data = request.get_json()
+@app.route('/messages/<int:id>', methods=['PATCH'])
+def update_message(id):
+    message = Message.query.get_or_404(id)
+    data = request.get_json()
+    message.body = data.get('body', message.body)
+    message.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(message.to_dict()), 200
 
-        new_plant = Plant(
-            name=data['name'],
-            image=data['image'],
-            price=data['price'],
-        )
-
-        db.session.add(new_plant)
-        db.session.commit()
-
-        return make_response(new_plant.to_dict(), 201)
-
-
-api.add_resource(Plants, '/plants')
-
-
-class PlantByID(Resource):
-
-    def get(self, id):
-        plant = Plant.query.filter_by(id=id).first().to_dict()
-        return make_response(jsonify(plant), 200)
-
-
-api.add_resource(PlantByID, '/plants/<int:id>')
-
+@app.route('/messages/<int:id>', methods=['DELETE'])
+def delete_message(id):
+    message = Message.query.get_or_404(id)
+    db.session.delete(message)
+    db.session.commit()
+    return '', 204
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)

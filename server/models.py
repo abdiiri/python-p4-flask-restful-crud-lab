@@ -1,16 +1,21 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy_serializer import SerializerMixin
+from datetime import datetime
+from app import db
 
-db = SQLAlchemy()
-
-class Plant(db.Model, SerializerMixin):
-    __tablename__ = 'plants'
+class Message(db.Model):
+    __tablename__ = 'messages'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    image = db.Column(db.String)
-    price = db.Column(db.Float)
-    is_in_stock = db.Column(db.Boolean)
+    body = db.Column(db.String, nullable=False)
+    username = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def __repr__(self):
-        return f'<Plant {self.name} | In Stock: {self.is_in_stock}>'
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "body": self.body,
+            "username": self.username,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
